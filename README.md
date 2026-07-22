@@ -53,7 +53,7 @@
 > python scripts/unified_search.py --query "CRISPR gene editing" --num 10
 > ```
 
-**你需要上传 / 发布的文件层级如下：**
+**项目结构 / Project Structure：**
 
 ```
 Unified-Research-Finder/
@@ -71,7 +71,7 @@ Unified-Research-Finder/
     └── register-api-key.md      # 免费注册 NCBI API key 引导
 ```
 
-（提交到 GitHub / SkillHub 时，请上传以上整个文件夹；`__pycache__` 等缓存已被 `.gitignore` 自动排除。）
+（运行时自动生成的 `__pycache__` 等缓存已被 `.gitignore` 排除，不会进入仓库。）
 
 ## 3. 技术原理
 
@@ -122,7 +122,7 @@ The skill searches both databases, merges and deduplicates, and tells you "cross
 > python scripts/unified_search.py --query "CRISPR gene editing" --num 10
 > ```
 
-**Files you should upload / publish (folder hierarchy):**
+**Project Structure:**
 
 ```
 Unified-Research-Finder/
@@ -140,7 +140,7 @@ Unified-Research-Finder/
     └── register-api-key.md      # Guide to register a free NCBI API key
 ```
 
-(When pushing to GitHub / SkillHub, upload the whole folder above; `__pycache__` etc. are auto-excluded by `.gitignore`.)
+(Runtime-generated caches such as `__pycache__` are excluded by `.gitignore` and never enter the repository.)
 
 ## 3. How It Works
 
