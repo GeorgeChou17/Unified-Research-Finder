@@ -2,11 +2,10 @@
 name: unified-research-finder
 description: 统一的学术文献检索助手。覆盖两大体系：(1) PubMed 官方 E-utilities API（esearch+efetch，真实
   PMID/摘要/DOI）与 PubMed 网页检索；(2) Google Scholar 及其镜像站——灯塔学术搜索、烂番薯学术搜索、Google
-  Scholar 香港镜像、Google Scholar 官方站，按「灯塔 → 烂番薯 → 香港镜像 → 官方」优先级自动回退（灯塔走 JSON API
-  最省内存最快）。当用户要找文献、查论文、搜 PubMed、查 Google
+  Scholar 香港镜像、Google Scholar 官方站，以及 KipHub学术、学术搜索Pro 等大陆镜像，按「kiphub → 烂番薯 → 学术搜索Pro → 灯塔 → 香港 → 官方」优先级自动回退。当用户要找文献、查论文、搜 PubMed、查 Google
   学术/谷歌学术、用学术镜像站、要影响因子或引用数据时启用。找不到就是找不到，绝不编造。
 agent_created: true
-version: v1.1
+version: v1.1.1
 triggers:
   - 找文献
   - 检索论文
@@ -21,6 +20,8 @@ triggers:
   - 学术镜像
   - 烂番薯
   - 灯塔学术
+  - KipHub
+  - 学术搜索Pro
   - 查影响因子
   - 论文引用
   - 相关论文
@@ -31,9 +32,9 @@ triggers:
   - 多库去重
 disable: false
 tools:
-  - unified_search.py
-  - pubmed_search.py
-  - scholar_search.py
+  - unified_search
+  - pubmed_search
+  - scholar_search
 ---
 
 # 学术文献检索助手 (Unified Research Finder)
@@ -108,7 +109,7 @@ tools:
 
 1. **运行脚本**（默认 auto，按优先级自动回退）：
    ```bash
-   # 自动：灯塔 → 烂番薯 → 香港镜像 → 官方站，取首个有结果的源
+   # 自动：kiphub → 烂番薯 → 学术搜索Pro → 灯塔 → 香港 → 官方，取首个有结果的源
    python scripts/scholar_search.py --query "large language model survey" --num 10
    # 指定单一源（如用户只要灯塔）
    python scripts/scholar_search.py --query "..." --source dotaindex
@@ -120,10 +121,11 @@ tools:
    输出 JSON：`{ok, source, query, count, results[], note}`。每篇结果含
    `title, url, authors, year, venue, snippet, citations, pdf_url`。
 2. **源优先级与回退**（默认 auto 行为）：
-   - **灯塔**（dotaindex）优先——走 JSON API，最快最稳、内存占用最低，作为主力首选源。
-   - **烂番薯**（lanfanshu）次之——大陆直连、服务端渲染，需带 Referer，高频会 403 限流。
-   - **香港镜像**（scholar.google.com.hk）再次——经典 HTML，大陆常被网络阻断。
-   - **官方站**（scholar.google.com）最后——经典 HTML，大陆常被网络阻断。
+   - **kiphub**（KipHub学术）优先——大陆直连、自定义 HTML 结构（`paper-summary-wrapper`），当前最快最稳。
+   - **烂番薯**（lanfanshu）次之——经典 Scholar HTML，添加了 `hl/as_sdt/btnG` 固定参数以绕过反爬墙。
+   - **学术搜索Pro**（scholar_pro）再次——card 布局自定义 HTML，含摘要和被引次数。
+   - **灯塔**（dotaindex）——JSON API，最快最省内存，但近期后端不稳定（500/超时）。
+   - **香港镜像 / 官方站**——经典 HTML，大陆常被网络阻断。
    - 任一源被拦截（403/验证码/超时）自动尝试下一源；全部失败则在 `note` 说明，**不返回虚构文献**。
 3. **浏览器兜底（可选）**：当所有 HTTP 尝试被拦截且用户需要，安装 Playwright 后以 `--browser` 模式启动无头浏览器渲染：
    ```bash
@@ -189,7 +191,7 @@ tools:
 
 检索条件：{query}，年份≥{ylo}，排序={sort}
 已开启多库去重：是（--no-dedup 可关）
-尝试数据源：PubMed（官方 API）、灯塔、烂番薯、香港镜像、Google 官方
+尝试数据源：PubMed（官方 API）、KipHub、烂番薯、学术搜索Pro、灯塔、香港镜像、Google 官方
 结果：{note 中的具体原因，如「PubMed 可达但无命中；烂番薯与灯塔均触发限流，香港/官方站网络不可达」}
 建议：稍后重试；或换更宽泛关键词；或 installed Playwright 后用 --browser 模式。
 ```

@@ -4,10 +4,12 @@
 scholar_search.py - Google Scholar 与大陆镜像站 统一检索。
 
 数据源（auto 模式按优先级依次尝试）：
-  1. dotaindex  灯塔学术搜索     https://www.dotaindex.com/scholar   -> JSON API（/api/scholar/search，最快最稳最省内存）
-  2. lanfanshu  烂番薯学术搜索   https://scholar.lanfanshu.cn/        -> 服务端渲染 HTML（经典 Scholar 结构）
-  3. hk         Google Scholar 香港镜像  https://scholar.google.com.hk/ -> 经典 HTML
-  4. google     Google Scholar 官方站    https://scholar.google.com/     -> 经典 HTML
+  1. kiphub     KipHub学术        https://www.kiphub.com/search          -> 自定义 HTML（paper-summary-wrapper 容器）
+  2. lanfanshu  烂番薯学术搜索     https://scholar.lanfanshu.cn/          -> 经典 Scholar HTML（gs_rt/gs_a/gs_rs）
+  3. scholar_pro 学术搜索Pro       https://www.googlescholar.pro/         -> 自定义 HTML（card-title/card-meta/card-text）
+  4. dotaindex  灯塔学术搜索       https://www.dotaindex.com/scholar     -> JSON API（/api/scholar/search，最快最稳最省内存）
+  5. hk         Google Scholar 香港镜像  https://scholar.google.com.hk/   -> 经典 HTML
+  6. google     Google Scholar 官方站    https://scholar.google.com/       -> 经典 HTML
 
 设计目标：低内存、速度快。默认走纯 HTTPS（仅用标准库 urllib），不依赖任何第三方包。
 当目标站点对纯 HTTP 做了拦截 / 验证码时，可用 --browser 切换到 Playwright 无头浏览器兜底
@@ -36,13 +38,35 @@ from html import unescape
 UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
       "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
 
-# 各源的检索基址 + 是否 JSON
+# 各源的检索基址 + 类型 + 参数名约定
+# 字段说明：
+#   label       中文名
+#   type        数据格式：json / html / html_custom（非经典 Scholar 标记）
+#   search_url  检索接口（不含查询字符串）
+#   query_param 查询关键词的参数名（默认 "q"）
+#   extra_params 固定追加的参数（如反爬需要的 hl/as_sdt/btnG）
+#   referer     请求时携带的 Referer 头
 SOURCES = {
+    "kiphub": {
+        "label": "KipHub学术",
+        "type": "html_custom",
+        "search_url": "https://www.kiphub.com/search?",
+        "query_param": "wd",
+        "extra_params": {},
+        "referer": "https://www.kiphub.com/",
+    },
     "lanfanshu": {
         "label": "烂番薯学术搜索",
         "type": "html",
         "search_url": "https://scholar.lanfanshu.cn/scholar?",
+        "extra_params": {"hl": "zh-CN", "as_sdt": "0,5", "btnG": ""},
         "referer": "https://scholar.lanfanshu.cn/",
+    },
+    "scholar_pro": {
+        "label": "学术搜索Pro",
+        "type": "html_custom",
+        "search_url": "https://www.googlescholar.pro/search_results.php?",
+        "referer": "https://www.googlescholar.pro/",
     },
     "dotaindex": {
         "label": "灯塔学术搜索",
@@ -63,7 +87,7 @@ SOURCES = {
         "referer": "https://scholar.google.com/",
     },
 }
-PRIORITY = ["dotaindex", "lanfanshu", "hk", "google"]
+PRIORITY = ["kiphub", "lanfanshu", "scholar_pro", "dotaindex", "hk", "google"]
 
 MONTH_ABBR = {"jan": "01", "feb": "02", "mar": "03", "apr": "04", "may": "05",
               "jun": "06", "jul": "07", "aug": "08", "sep": "09", "oct": "10",
@@ -102,12 +126,18 @@ def http_get(url, headers, timeout=25, retries=2):
     raise RuntimeError(f"请求失败（{retries} 次）：{last_err}")
 
 
-def build_params(query, start, sort, ylo, hl):
-    params = {"q": query, "start": start, "hl": hl}
+def build_params(query, start, sort, ylo, hl, cfg=None):
+    # 使用源配置中的 query_param（默认 "q"），并合并 extra_params
+    qp = (cfg or {}).get("query_param", "q")
+    params = {qp: query, "hl": hl}
+    if cfg and cfg.get("extra_params"):
+        params.update(cfg["extra_params"])
+    if start:
+        params["start"] = start
     if ylo:
         params["as_ylo"] = ylo
     if sort == "date":
-        params["scisbd"] = "1"  # 灯塔 / 经典 Scholar 均用 scisbd=1 表示按日期排序
+        params["scisbd"] = "1"
     return params
 
 
@@ -235,6 +265,90 @@ def parse_dotaindex_json(data):
 
 
 # ---------------------------------------------------------------------------
+# KipHub 自定义 HTML 解析（paper-summary-wrapper 容器）
+# ---------------------------------------------------------------------------
+def parse_kiphub_html(html_text):
+    """解析 kiphub.com 的搜索结果页。"""
+    results = []
+    blocks = re.findall(
+        r'<div class="paper-summary-wrapper[^>]*>(.*?)'
+        r'(?=<div class="paper-summary-wrapper|$)', html_text, re.S)
+    for blk in blocks:
+        # 标题 + 链接（pp-title div 内有 img 等元素，匹配第一个 <a>）
+        tm = re.search(r'class="pp-title[^"]*"[^>]*>(.*?)</div>', blk, re.S)
+        if tm:
+            lm = re.search(r'<a[^>]*href="([^"]+)"[^>]*>(.*?)</a>', tm.group(1), re.S)
+            title = clean_html(lm.group(2)) if lm else ""
+            url = lm.group(1) if lm else ""
+        else:
+            title, url = "", ""
+
+        # 作者 / 期刊 / 年份（.pp-info .author 内的文本）
+        mm = re.search(r'class="author"[^>]*>(.*?)</div>', blk, re.S)
+        meta_text = clean_html(mm.group(1)) if mm else ""
+        authors, year, venue = _parse_gs_a(meta_text)
+
+        results.append({
+            "title": title,
+            "url": url,
+            "authors": authors,
+            "year": year,
+            "venue": venue,
+            "snippet": "",
+            "citations": 0,
+            "pdf_url": "",
+        })
+    return [r for r in results if r.get("title")]
+
+
+# ---------------------------------------------------------------------------
+# 学术搜索Pro 自定义 HTML 解析（card 容器）
+# ---------------------------------------------------------------------------
+def parse_scholarpro_html(html_text):
+    """解析 googlescholar.pro 的搜索结果页（card-title/card-meta/card-text）。"""
+    results = []
+    cards = re.findall(
+        r'<div class="card"[^>]*>.*?<h3 class="card-title">(.*?)'
+        r'(?=<div class="card"[^>]*>.*?<h3 class="card-title"|$)', html_text, re.S)
+    for card in cards:
+        # 标题 + 链接
+        tm = re.search(r'<a[^>]*href="([^"]+)"[^>]*>(.*?)</a>', card, re.S)
+        title = clean_html(tm.group(2)) if tm else ""
+        url = tm.group(1) if tm else ""
+
+        # 元信息（card-meta）
+        mm = re.search(r'class="card-meta"[^>]*>(.*?)</div>', card, re.S)
+        meta_text = clean_html(mm.group(1)) if mm else ""
+        authors, year, venue = _parse_gs_a(meta_text)
+
+        # 摘要（card-text）
+        sm = re.search(r'class="card-text"[^>]*>(.*?)</div>', card, re.S)
+        snippet = clean_html(sm.group(1)) if sm else ""
+
+        # 被引次数（从 card-actions / card-side-links 区域找 "被引用次数" "Cited by"）
+        cm = re.search(r'(?:被引用次数|Cited by)\D*(\d[\d,]*)', card, re.I)
+        citations = int(re.sub(r"[^\d]", "", cm.group(1))) if cm else 0
+
+        # PDF（card-side-links 区域的 [PDF] 链接）
+        pm = re.search(r'\[PDF\]\s*<a[^>]*href="([^"]+)"', card)
+        if not pm:
+            pm = re.search(r'class="card-side-links[^"]*"[^>]*>\s*<a[^>]*href="([^"]+)"', card)
+        pdf_url = pm.group(1) if pm else ""
+
+        results.append({
+            "title": title,
+            "url": url,
+            "authors": authors,
+            "year": year,
+            "venue": venue,
+            "snippet": snippet,
+            "citations": citations,
+            "pdf_url": pdf_url,
+        })
+    return [r for r in results if r.get("title")]
+
+
+# ---------------------------------------------------------------------------
 # 单源检索（含分页）
 # ---------------------------------------------------------------------------
 def search_source(key, query, num, sort, ylo, hl, use_browser):
@@ -245,7 +359,7 @@ def search_source(key, query, num, sort, ylo, hl, use_browser):
     blocked = False
     note = ""
     while len(out_results) < num and pages < 5:
-        params = build_params(query, start, sort, ylo, hl)
+        params = build_params(query, start, sort, ylo, hl, cfg)
         url = cfg["search_url"] + urllib.parse.urlencode(params)
 
         if cfg["type"] == "json":
@@ -282,7 +396,8 @@ def search_source(key, query, num, sort, ylo, hl, use_browser):
             if not page:
                 break
         else:
-            # 经典 HTML 源
+            # HTML / HTML 自定义源
+            content = ""
             if use_browser:
                 content, berr, bnote = fetch_via_browser(url)
                 if berr:
@@ -302,14 +417,23 @@ def search_source(key, query, num, sort, ylo, hl, use_browser):
                     blocked = True
                     note = f"{cfg['label']} 访问失败：{e}"
                     break
-            page = parse_scholar_html(content)
-            if not page and html_is_blocked(content):
-                blocked = True
-                note = f"{cfg['label']} 触发验证码/流量限制，需切换 --browser 模式或换源"
-                break
-            out_results.extend(page)
+            # 按源类型选择解析器
+            if cfg["type"] == "html_custom":
+                if key == "kiphub":
+                    page = parse_kiphub_html(content)
+                elif key == "scholar_pro":
+                    page = parse_scholarpro_html(content)
+                else:
+                    page = parse_scholar_html(content)
+            else:
+                page = parse_scholar_html(content)
+                if not page and html_is_blocked(content):
+                    blocked = True
+                    note = f"{cfg['label']} 触发验证码/流量限制，需切换 --browser 模式或换源"
+                    break
             if not page:
                 break
+            out_results.extend(page)
 
         start += 10
         pages += 1
@@ -389,7 +513,20 @@ def main():
     else:
         # 所有源都未产出结果（可能全部被拦截或全部为空）
         out["ok"] = bool(out["results"])
-        out["note"] = out.get("note") or "所有数据源均未返回结果（可能全部被拦截或确无相关文献）。"
+        fallback_hint = (
+            "所有 Scholar 数据源均不可达。"
+            "当前中国 Scholar 镜像（灯塔/烂番薯/panda985/gfsoso 等）已全面启用反爬/验证码，"
+            "纯 HTTP 请求难以穿透。"
+        )
+        if not args.browser:
+            fallback_hint += (
+                " 如安装了 Playwright，可用 --browser 模式通过无头浏览器绕过验证码："
+                " pip install playwright && playwright install chromium，"
+                "然后重新运行并加 --browser。"
+            )
+        else:
+            fallback_hint += " Playwright 模式也已尝试，仍无法获取结果。"
+        out["note"] = out.get("note") or fallback_hint
 
     print(json.dumps(out, ensure_ascii=False, indent=2))
 

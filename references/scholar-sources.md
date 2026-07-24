@@ -9,10 +9,14 @@
 
 | 优先级 | key         | 名称                | 类型 | 检索地址                                      |
 |--------|-------------|---------------------|------|-----------------------------------------------|
-| 1      | dotaindex   | 灯塔学术搜索        | JSON | `https://www.dotaindex.com/api/scholar/search?q=...` |
-| 2      | lanfanshu   | 烂番薯学术搜索      | HTML | `https://scholar.lanfanshu.cn/scholar?q=...`  |
-| 3      | hk          | Google Scholar 香港镜像 | HTML | `https://scholar.google.com.hk/scholar?q=...` |
-| 4      | google      | Google Scholar 官方站   | HTML | `https://scholar.google.com/scholar?q=...`    |
+| 1      | kiphub      | KipHub学术          | HTML | `https://www.kiphub.com/search?wd=...`        |
+| 2      | lanfanshu   | 烂番薯学术搜索      | HTML | `https://scholar.lanfanshu.cn/scholar?hl=zh-CN&as_sdt=0,5&q=...&btnG=` |
+| 3      | scholar_pro | 学术搜索Pro         | HTML | `https://www.googlescholar.pro/search_results.php?q=...` |
+| 4      | dotaindex   | 灯塔学术搜索        | JSON | `https://www.dotaindex.com/api/scholar/search?q=...` |
+| 5      | hk          | Google Scholar 香港镜像 | HTML | `https://scholar.google.com.hk/scholar?q=...` |
+| 6      | google      | Google Scholar 官方站   | HTML | `https://scholar.google.com/scholar?q=...`    |
+
+> 注意：kiphub 使用 `wd`（而非 `q`）作为查询参数名；烂番薯需携带 `hl=zh-CN&as_sdt=0,5&btnG=` 以绕过反爬墙。
 
 用户也可用 `--source lanfanshu|dotaindex|hk|google` 强制指定单一源。
 
@@ -42,6 +46,28 @@
     - `citationCount` — 被引次数（字符串数字）
     - `openAccessUrl` / `accessLinks[].url` — PDF 全文链接
 - 限流表现：被限流时返回 `results: []` 且 `total: 0`（而非报错）。脚本在首页空结果时退避 1.5s 重试一次。
+
+## KipHub 学术（kiphub）
+
+自定义 Bootstrap 结构的 Scholar 镜像：
+
+- 检索地址：`https://www.kiphub.com/search?wd=QUERY`（注意查询参数名是 `wd` 而非 `q`）
+- 结果容器：`<div class="paper-summary-wrapper">`
+- 标题/链接：`<div class="pp-title">` 内的第一个 `<a href="...">`
+- 作者·期刊·年份：`<div class="author">` 内的文本（格式：`作者, 作者... -期刊, 年份`）
+- 当前不支持摘要片段与被引次数
+
+## 学术搜索Pro（scholar_pro）
+
+自定义 card 布局的 Scholar 镜像：
+
+- 检索地址：`https://www.googlescholar.pro/search_results.php?q=QUERY`
+- 结果容器：`<div class="card">`
+- 标题/链接：`<h3 class="card-title">` 内的 `<a href="...">`
+- 元信息：`<div class="card-meta">` 内的文本
+- 摘要：`<div class="card-text">` 内的文本
+- 被引次数：card 文本中 `被引用次数 N` / `Cited by N` 模式
+- PDF 链接：`[PDF]` 后的 `<a>` 或 `card-side-links` 内的第一个 `<a>`
 
 ## 烂番薯 / 香港镜像 / 官方（经典 Scholar HTML）
 

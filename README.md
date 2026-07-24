@@ -24,7 +24,7 @@
 **Unified-Research-Finder** 是一个用于 WorkBuddy / 兼容 SkillHub 的「学术文献一站式检索」技能。它把两套最常用的学术搜索引擎合二为一：
 
 - **PubMed**（生物医学权威数据库）——走官方 E-utilities API，返回真实 PMID、摘要、DOI。
-- **Google Scholar 及其镜像站**——覆盖「灯塔学术」「烂番薯学术」「Google Scholar 香港镜像」「Google Scholar 官方站」，按稳定性自动回退。
+- **Google Scholar 及其镜像站**——覆盖「KipHub学术」「烂番薯学术」「学术搜索Pro」「灯塔学术」「Google Scholar 香港镜像」「Google Scholar 官方站」**六个源**，按「kiphub → 烂番薯 → 学术搜索Pro → 灯塔 → 香港 → 官方」优先级自动回退。
 
 默认开启 **PubMed + Scholar 跨库合并去重**：同一篇论文不会在两库里重复出现。所有结果均来自真实网络响应，**找不到就是找不到，绝不编造**。
 
@@ -58,6 +58,7 @@
 ```
 Unified-Research-Finder/
 ├── SKILL.md                # 技能说明（触发词、检索流程、输出模板）
+├── CHANGELOG.md            # 更新日志
 ├── LICENSE                 # MIT-0 开源协议
 ├── README.md               # 本说明文件（中英双语）
 ├── .gitignore              # 忽略 Python 缓存等无关文件
@@ -94,7 +95,7 @@ Unified-Research-Finder/
 **Unified-Research-Finder** is an all-in-one academic literature search skill for WorkBuddy / SkillHub-compatible agents. It unifies two of the most-used scholarly search engines:
 
 - **PubMed** (the authoritative biomedical database) — powered by the official NCBI E-utilities API, returning real PMIDs, abstracts, and DOIs.
-- **Google Scholar and its mirrors** — covering "灯塔学术 (Dotaindex)", "烂番薯学术 (Lanfanshu)", the Google Scholar Hong Kong mirror, and the official Google Scholar site, with automatic fallback by stability.
+- **Google Scholar and its mirrors** — covering "KipHub", "Lanfanshu", "Scholar Pro", "Dotaindex", the Google Scholar Hong Kong mirror, and the official Google Scholar site — **six sources** with auto fallback in priority order.
 
 Cross-database **merge + deduplication (PubMed + Scholar) is on by default**: the same paper never appears twice. Every result comes from a real network response — **if nothing is found, we say so; we never fabricate.**
 
@@ -127,6 +128,7 @@ The skill searches both databases, merges and deduplicates, and tells you "cross
 ```
 Unified-Research-Finder/
 ├── SKILL.md                # Skill manifest (triggers, search flows, output templates)
+├── CHANGELOG.md            # Changelog
 ├── LICENSE                 # MIT-0 license
 ├── README.md               # This file (bilingual)
 ├── .gitignore              # Excludes Python caches and unrelated files
