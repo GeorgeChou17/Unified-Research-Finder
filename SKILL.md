@@ -6,6 +6,7 @@ description: 统一的学术文献检索助手。覆盖两大体系：(1) PubMed
   最省内存最快）。当用户要找文献、查论文、搜 PubMed、查 Google
   学术/谷歌学术、用学术镜像站、要影响因子或引用数据时启用。找不到就是找不到，绝不编造。
 agent_created: true
+version: v1.1
 triggers:
   - 找文献
   - 检索论文
@@ -29,6 +30,10 @@ triggers:
   - 跨库检索
   - 多库去重
 disable: false
+tools:
+  - unified_search.py
+  - pubmed_search.py
+  - scholar_search.py
 ---
 
 # 学术文献检索助手 (Unified Research Finder)
